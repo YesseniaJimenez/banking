@@ -7,13 +7,6 @@ import transactionRoutes from "./routes/transaction";
 
 dotenv.config();
 
-if (!process.env.PORT) {
-  throw new Error("missing required environment variable: PORT");
-}
-if (!process.env.MONGO_URI) {
-  throw new Error("missing required environment variable: MONGO_URI");
-}
-
 const app = express();
 app.use(express.json());
 
