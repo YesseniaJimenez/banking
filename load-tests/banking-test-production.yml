@@ -1,0 +1,83 @@
+config:
+  target: "https://yessbank.edgaryasociados.synology.me"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Create users and perform transactions"
+  processor: "./processor.js"
+  variables:
+    userCount: 100
+
+scenarios:
+  - name: "Banking operations flow"
+    weight: 1
+    flow:
+      # Create a new user with initial balance
+      - post:
+          url: "/api/users/create-user"
+          json:
+            username: "user_{{ $randomString() }}_{{ $randomNumber(0, 999999) }}"
+            email: "user_{{ $randomString() }}_{{ $randomNumber(0, 999999) }}@test.com"
+            password: "password123"
+            balance: 1000
+          capture:
+            - json: "$.user.id"
+              as: "userId"
+            - json: "$.user.email"
+              as: "userEmail"
+            - json: "$.user.balance"
+              as: "initialBalance"
+
+      # Login to get JWT token
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ userEmail }}"
+            password: "password123"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+
+      # Deposit money
+      - post:
+          url: "/api/transactions/deposit"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            amount: 500
+          capture:
+            - json: "$.balance"
+              as: "balanceAfterDeposit"
+
+      # Withdraw money
+      - post:
+          url: "/api/transactions/withdraw"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            amount: 200
+          capture:
+            - json: "$.balance"
+              as: "balanceAfterWithdraw"
+
+      # Get all users to find another user to transfer to
+      - get:
+          url: "/api/users"
+          capture:
+            - json: "$[0].email"
+              as: "recipientEmail"
+
+      # Login with recipient to get their ID (we'll create this flow separately)
+      # For now, we'll do another deposit
+      - post:
+          url: "/api/transactions/deposit"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            amount: 100
+          capture:
+            - json: "$.balance"
+              as: "finalBalance"
+
+      # Validate final balance
+      - function: "validateBalance"
